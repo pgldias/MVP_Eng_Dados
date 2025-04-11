@@ -1,11 +1,46 @@
-# MVP_Eng_Dados
+# MVP de Engenharia de Dados - PUC-Rio
+
+# Objetivo
+
+Este trabalho tem como objetivo aplicar práticas de engenharia de dados aprendidas no curso e constuir um pipeline completo de dados utilizando uma tecnologia de nuvem.
+O pipeline irá envolver a busca, coleta, modelagem, carga e análise dos dados. 
+
+Foram selecionados dados históricos de partidas de tênis profissional (ATP), um assunto que me interessa, e a partir disso foram elaboradas questões sobre as conquistas dos jogadores. 
+
+Perguntas:
+1. Quantos jogadores já ganharam os 4 grand slams? ("Career Grand Slam")
+2. Quantos já conseguiram os 4 grand slams no mesmo ano e qual foi o ultimo ano que isso ocorreu?
+3. Que jogador permaneceu mais tempo no top 1? E no top 5?
+4. Que caracteristicas em comum tem essses jogadores?
 
 
 
+# Coleta
+
+## Coleta do dataset
+
+A coleta dos dados utilizados neste trabalho é realizada a partir do **repositório do Kaggle**, por meio da API oficial da plataforma. Para garantir uma autenticação segura e automatizada dentro do ambiente do **Databricks**, foi necessário criar um processo específico para carregar as variáveis de ambiente contendo as credenciais da API do Kaggle.
+
+Como o Databricks não consegue acessar diretamente os arquivos `.env` armazenados no DBFS de forma nativa, foi implementada uma função personalizada (`load_env_from_dbfs`) para ler e interpretar o conteúdo do arquivo `.env` como texto. Essa abordagem se mostrou eficaz para popular as variáveis de ambiente dentro da sessão ativa do notebook.
+
+Após a configuração do ambiente, o dataset **"tennis"** foi baixado do Kaggle e descompactado no diretório temporário `/tmp`. O arquivo principal, um banco de dados no formato **SQLite**, foi então carregado e inspecionado. As tabelas disponíveis — `matches`, `players` e `rankings` — foram extraídas utilizando consultas SQL diretas, convertidas para DataFrames do Pandas e posteriormente carregadas para o DBFS utilizando spark.
 
 
 
+# Modelagem
 
+### Modelo Estrela
+
+### Tabela Fato
+- **f_Matches**: contém o resultado e estatísticas das partidas
+  - FK: `tourney_id`, `winner_id`, `loser_id`, `tourney_date`
+  - Métricas: aces, double faults, pontos de saque, tempo, score, ranking etc.
+
+### Tabelas Dimensão
+- **d_Players**: dados dos jogadores (mão, altura, país, data de nascimento)
+- **d_Tournaments**: informações dos torneios (superfície, nível, tamanho da chave)
+- **d_Calendario**: tempo em granularidade de dia, mês, ano
+- **d_Ranking**: posição e pontos de ranking por jogador por data (1 data por semana)
 
 
 
@@ -118,3 +153,27 @@
 | `winner_rank_points`  | INT  | Pontos de ranking do vencedor         |
 | `loser_rank`          | INT  | Ranking do perdedor                   |
 | `loser_rank_points`   | INT  | Pontos de ranking do perdedor         |
+
+
+
+
+# Script: Recreate Metastore
+
+## Objetivo
+
+Este script tem como objetivo **recriar o metastore** do Spark/Hive com base na estrutura de diretórios existente no caminho do warehouse.  
+Ele é útil em cenários onde o metastore foi perdido ou corrompido, como no caso da reinicialização do cluster, mas os dados físicos (arquivos Delta) ainda estão presentes no armazenamento DBFS.
+
+## Funcionamento
+
+O script percorre o diretório base (`/user/hive/warehouse/`), onde os databases e tabelas do Hive/Spark são armazenados fisicamente, e recria:
+
+- **Databases**, a partir de pastas com sufixo `.db`
+- **Tabelas Delta**, baseando-se nas subpastas dos databases
+
+O Spark infere o schema automaticamente para recriar as tabelas no catálogo, assumindo que os dados estão em formato **Delta Lake**.
+
+## Observações 
+- O script assume que todas as tabelas são do tipo Delta Lake
+- Utiliza dbutils.fs.ls, que é específico do ambiente Databricks
+- Requer que os arquivos estejam íntegros e acessíveis no caminho do warehouse
